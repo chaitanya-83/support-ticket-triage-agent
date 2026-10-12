@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ticket Triage Agent - Live Demo</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1c2430; --mute:#6b7685; --line:#e3e7ec; --accent:#2f5bea;
+          --p1:#d93a3a; --p2:#e8871e; --p3:#d6a800; --p4:#2e9e5b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12161c; --card:#1b212a; --ink:#e7ebf0; --mute:#93a0b0; --line:#2a323d; --accent:#6c8cff; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:18px 24px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); }
+  header h1 { font-size:18px; margin:0; }
+  .badge { font-size:12px; padding:3px 10px; border-radius:99px; border:1px solid var(--line); color:var(--mute); }
+  .badge.ok { color:var(--p4); border-color:var(--p4); } .badge.warn { color:var(--p2); border-color:var(--p2); }
+  main { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:20px; padding:20px 24px; max-width:1200px; margin:auto; }
+  @media (max-width:860px) { main { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:20px; }
+  .card h2 { font-size:14px; margin:0 0 12px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); }
+  textarea { width:100%; min-height:90px; padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font:inherit; resize:vertical; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  button { font:inherit; cursor:pointer; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); padding:7px 12px; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button:disabled { opacity:.6; cursor:wait; }
+  .chip { font-size:13px; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:99px; font-size:13px; font-weight:600; color:#fff; }
+  .p1{background:var(--p1)} .p2{background:var(--p2)} .p3{background:var(--p3)} .p4{background:var(--p4)}
+  .result-top { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .reason { color:var(--mute); margin:6px 0 12px; }
+  ol.trace { margin:0; padding-left:20px; font:13px/1.7 ui-monospace,Consolas,monospace; }
+  ol.trace li.llm::marker, ol.trace li.fb::marker { font-weight:700; }
+  .tag { font-size:11px; padding:1px 6px; border-radius:6px; margin-left:6px; }
+  .tag.llm { background:rgba(46,158,91,.15); color:var(--p4); } .tag.fb { background:rgba(232,135,30,.15); color:var(--p2); }
+  .agent { margin-bottom:12px; } .agent .top { display:flex; justify-content:space-between; font-size:14px; }
+  .bar { height:8px; background:var(--bg); border-radius:99px; overflow:hidden; margin-top:4px; border:1px solid var(--line); }
+  .bar > span { display:block; height:100%; background:var(--accent); transition:width .5s; }
+  .skills { font-size:12px; color:var(--mute); }
+  table { width:100%; border-collapse:collapse; font-size:13px; } th,td { text-align:left; padding:6px 4px; border-bottom:1px solid var(--line); }
+  th { color:var(--mute); font-weight:600; } td.t { max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .flash { animation:flash 1.2s; } @keyframes flash { from { background:rgba(47,91,234,.25); } to { background:transparent; } }
+  .err { color:var(--p1); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Support Ticket Triage Agent</h1>
+  <span class="badge" id="llmBadge">checking...</span>
+  <span class="badge">read &rarr; classify &rarr; prioritise &rarr; check workload &rarr; assign</span>
+  <span style="flex:1"></span>
+  <button id="resetBtn" title="Restore the seeded demo data">Reset demo data</button>
+</header>
+<main>
+  <section>
+    <div class="card">
+      <h2>New ticket</h2>
+      <textarea id="text" placeholder="Describe the customer's problem..."></textarea>
+      <div class="row">
+        <button class="primary" id="submitBtn">Triage ticket</button>
+        <span id="status" class="chip"></span>
+      </div>
+      <div class="row">
+        <span class="chip" style="color:var(--mute)">Try:</span>
+        <button class="chip ex">I was charged twice for my order and need a refund urgently</button>
+        <button class="chip ex">My package has not arrived and tracking has not updated for a week</button>
+        <button class="chip ex">The phone screen arrived cracked, packaging was torn</button>
+        <button class="chip ex">How do I change the email address on my profile?</button>
+        <button class="chip ex">The app crashes every time I open checkout, shows error 500</button>
+      </div>
+    </div>
+    <div class="card" id="resultCard" hidden>
+      <h2>Agent decision</h2>
+      <div class="result-top" id="resultTop"></div>
+      <div class="reason" id="reason"></div>
+      <h2>Step-by-step trace</h2>
+      <ol class="trace" id="trace"></ol>
+    </div>
+  </section>
+  <section>
+    <div class="card"><h2>Agent workload (live)</h2><div id="agents"></div></div>
+    <div class="card"><h2>Recent tickets</h2>
+      <table><thead><tr><th>#</th><th>Ticket</th><th>Cat</th><th>P</th><th>Agent</th></tr></thead><tbody id="tickets"></tbody></table>
+    </div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+let lastAssigned = null;
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(path + " -> " + r.status);
+  return r.json();
+}
+
+async function loadInfo() {
+  try {
+    const i = await api("/info"), b = $("llmBadge");
+    b.textContent = i.llm_enabled ? `LLM on: ${i.backend}${i.model ? " / " + i.model : ""}` : "LLM off (rule fallback)";
+    b.className = "badge " + (i.llm_enabled ? "ok" : "warn");
+  } catch (e) { $("llmBadge").textContent = "API unreachable"; }
+}
+
+async function loadAgents() {
+  const agents = await api("/agents");
+  const max = Math.max(1, ...agents.map(a => a.load_score));
+  const box = $("agents"); box.replaceChildren();
+  for (const a of agents) {
+    const d = el("div", "agent" + (a.name === lastAssigned ? " flash" : ""));
+    const top = el("div", "top");
+    top.append(el("strong", "", a.name), el("span", "", `${a.open_count} open | ${a.high_priority_count} high | load ${a.load_score}`));
+    const bar = el("div", "bar"), fill = el("span"); fill.style.width = (a.load_score / max * 100) + "%"; bar.append(fill);
+    d.append(top, bar, el("div", "skills", "skills: " + a.skills.join(", ")));
+    box.append(d);
+  }
+}
+
+async function loadTickets() {
+  const rows = await api("/tickets?limit=8");
+  const tb = $("tickets"); tb.replaceChildren();
+  for (const t of rows) {
+    const tr = el("tr", t.id === window.__newId ? "flash" : "");
+    const p = el("span", "pill p" + t.priority, "P" + t.priority);
+    const tdP = el("td"); tdP.append(p);
+    const tdT = el("td", "t", t.text); tdT.title = t.text;
+    tr.append(el("td", "", t.id), tdT, el("td", "", t.category), tdP, el("td", "", t.agent || "-"));
+    tb.append(tr);
+  }
+}
+
+function showResult(r) {
+  $("resultCard").hidden = false;
+  const top = $("resultTop"); top.replaceChildren(
+    el("span", "pill p" + r.priority, "P" + r.priority),
+    el("strong", "", "Category: " + r.category),
+    el("span", "", "assigned to "), el("strong", "", r.assigned_agent),
+    el("span", "badge", "ticket #" + r.ticket_id));
+  $("reason").textContent = r.assignment_reason;
+  const ol = $("trace"); ol.replaceChildren();
+  for (const step of r.trace) {
+    const li = el("li");
+    const fb = /fallback/.test(step), llm = /\(llm\)/.test(step);
+    li.className = fb ? "fb" : llm ? "llm" : "";
+    li.append(document.createTextNode(step.replace(/ \((llm|keyword-fallback|rule-fallback)\)/, "")));
+    if (llm) li.append(el("span", "tag llm", "LLM"));
+    if (fb) li.append(el("span", "tag fb", "fallback rules"));
+    ol.append(li);
+  }
+}
+
+async function submit() {
+  const text = $("text").value.trim();
+  if (text.length < 5) { $("status").textContent = "Enter a ticket first."; return; }
+  const btn = $("submitBtn"); btn.disabled = true; $("status").className = "chip"; $("status").textContent = "Agent working...";
+  const t0 = performance.now();
+  try {
+    const r = await api("/tickets", { method: "POST", headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ text, customer: "demo" }) });
+    lastAssigned = r.assigned_agent; window.__newId = r.ticket_id;
+    showResult(r);
+    $("status").textContent = `Done in ${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    await Promise.all([loadAgents(), loadTickets()]);
+  } catch (e) { $("status").className = "chip err"; $("status").textContent = "Error: " + e.message; }
+  btn.disabled = false;
+}
+
+$("submitBtn").onclick = submit;
+$("text").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); });
+document.querySelectorAll(".ex").forEach(b => b.onclick = () => { $("text").value = b.textContent; $("text").focus(); });
+$("resetBtn").onclick = async () => {
+  await api("/reset", { method: "POST" }); lastAssigned = null; window.__newId = null;
+  $("resultCard").hidden = true; await Promise.all([loadAgents(), loadTickets()]);
+};
+loadInfo(); loadAgents(); loadTickets();
+</script>
+</body>
+</html>

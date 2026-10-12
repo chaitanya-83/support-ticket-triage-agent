@@ -1,0 +1,17 @@
+[
+ {"text": "I was charged twice for my order and need this fixed urgently", "category": "billing", "max_priority": 2},
+ {"text": "Please send me an invoice copy for last month's payment", "category": "billing", "max_priority": 4},
+ {"text": "I want my money back, the product was not what I ordered", "category": "refund", "max_priority": 3},
+ {"text": "Refund for order 4521 still not received after 3 weeks, I will contact my lawyer", "category": "refund", "max_priority": 1},
+ {"text": "The phone screen arrived cracked, packaging was torn", "category": "damaged", "max_priority": 3},
+ {"text": "Item is broken and defective, I need a replacement", "category": "damaged", "max_priority": 3},
+ {"text": "My package has not arrived and tracking has not updated for a week", "category": "delivery", "max_priority": 3},
+ {"text": "Delivery was late again, when will my parcel get here?", "category": "delivery", "max_priority": 3},
+ {"text": "The app crashes every time I open checkout, shows error 500", "category": "technical", "max_priority": 3},
+ {"text": "I cannot login, the page says not working after password entry", "category": "technical", "max_priority": 3},
+ {"text": "How do I change the email address on my profile?", "category": "account", "max_priority": 4},
+ {"text": "I forgot my password and the reset email never comes", "category": "account", "max_priority": 3},
+ {"text": "Do you have a store in Hyderabad?", "category": "other", "max_priority": 4},
+ {"text": "Suspected fraud: unknown payment of 12,000 on my card, escalate immediately", "category": "billing", "max_priority": 1},
+ {"text": "Return my money, the damaged item you sent is unusable, urgent", "category": "refund", "max_priority": 2}
+]
